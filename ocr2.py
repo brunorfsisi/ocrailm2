@@ -5,9 +5,6 @@ from azure.core.credentials import AzureKeyCredential
 from azure.ai.formrecognizer import DocumentAnalysisClient
 import io
 import json
-from dotenv import load_dotenv
-import os
-load_dotenv()
 
 def main():
     st.set_page_config(layout="wide") 
@@ -15,10 +12,12 @@ def main():
     # Define o layout da página para ocupar a tela inteira
     st.title("Extração de Dados com Inteligência Artificial")
 
-    
+    # Carregar configurações do arquivo JSON
+    with open('config.json', 'r') as f:
+        config = json.load(f)
 
-    endpoint = os.getenv('AZURE_FORM_RECOGNIZER_ENDPOINT')
-    key = os.getenv('AZURE_FORM_RECOGNIZER_KEY')
+    endpoint = config['AZURE_ENDPOINT']
+    key = config['AZURE_KEY']
 
     # Inicialize o cliente do Azure Form Recognizer
     form_recognizer_client = DocumentAnalysisClient(endpoint=endpoint, credential=AzureKeyCredential(str(key)))
