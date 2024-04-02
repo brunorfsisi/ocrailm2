@@ -23,6 +23,9 @@ def main():
     form_recognizer_client = DocumentAnalysisClient(endpoint=endpoint, credential=AzureKeyCredential(str(key)))
 
     col1, col2 = st.columns(2)  # Divide a tela em duas colunas
+    result = None  # Inicialize a variável result fora dos blocos with
+
+    all_tables = []  # Armazenará todas as tabelas
 
     with col1:  # Coluna para upload e visualização da imagem
         uploaded_file = st.file_uploader("Carregue o arquivo", type=["pdf", "jpg", "png"], key="file_uploader")
@@ -30,7 +33,7 @@ def main():
         if uploaded_file is not None:
             file_stream = io.BytesIO(uploaded_file.getvalue())
             with st.spinner('Analisando documento...'):
-                result = analyze_document_from_stream(form_recognizer_client, file_stream)
+                result = analyze_document(form_recognizer_client, file_stream)
 
             file_stream.seek(0)  # Volta ao início do arquivo para reutilização
             image = Image.open(file_stream)
@@ -39,19 +42,50 @@ def main():
                 image_with_tables = draw_tables_on_image(image, result.tables)
                 st.image(image_with_tables, caption='Imagem com Marcações das Tabelas')
 
+            # Exibir informações de confiança
+            if hasattr(result, 'confidence'):
+                st.subheader('Confiança:')
+                st.write(result.confidence)
+
+            # Exibir informações do campo 'Fields' se estiverem disponíveis
+            if hasattr(result, 'fields'):
+                st.subheader('Campos (Fields):')
+                fields = result.fields
+                for field in fields:
+                    st.write(f"**{field.name}:** {field.value}")
+
+            # Adiciona todas as tabelas à lista de tabelas
+            if hasattr(result, 'tables'):
+                all_tables.extend(result.tables)
+
+    # Verificar se result possui métricas fora do bloco with col1
+    if result is not None:
+        if hasattr(result, 'metrics'):
+            st.subheader('Métricas do Modelo:')
+            metrics = result.metrics
+            for metric_name, metric_value in metrics.items():
+                st.write(f"**{metric_name}:** {metric_value}")
+
     with col2:  # Coluna para exibição das tabelas e botões de download
-        if uploaded_file is not None and hasattr(result, 'tables') and result.tables:
-            for i, table in enumerate(result.tables):
+        if uploaded_file is not None and all_tables:
+            concatenated_df = pd.DataFrame()  # Dataframe vazio para concatenar todas as tabelas
+
+            for i, table in enumerate(all_tables):
                 st.subheader(f'Tabela {i+1}')
                 df = table_to_dataframe(table)
                 st.table(df)
 
-                # Converte o DataFrame em um arquivo Excel
+                # Concatena a tabela atual ao DataFrame concatenado
+                concatenated_df = pd.concat([concatenated_df, df], ignore_index=True)
+
+            if not concatenated_df.empty:
+                # Converte o DataFrame concatenado em um arquivo Excel
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df.to_excel(writer, index=True)
+                    concatenated_df.to_excel(writer, index=False)
                 output.seek(0)
-                st.download_button(label=f"Baixar Tabela {i+1} como Excel", data=output, file_name=f"tabela_{i+1}.xlsx", mime="application/vnd.ms-excel")
+                # Coloca o botão de download fora do loop, garantindo sua unicidade
+                st.download_button(label="Baixar Todas as Tabelas como Excel", data=output, file_name="todas_as_tabelas.xlsx", mime="application/vnd.ms-excel")
 
         elif uploaded_file is None:
             st.write("Aguardando upload do arquivo...")
