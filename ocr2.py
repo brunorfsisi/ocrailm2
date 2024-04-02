@@ -29,11 +29,13 @@ def main():
 
     with col1:  # Coluna para upload e visualização da imagem
         uploaded_file = st.file_uploader("Carregue o arquivo", type=["pdf", "jpg", "png"], key="file_uploader")
-
+    
         if uploaded_file is not None:
             file_stream = io.BytesIO(uploaded_file.getvalue())
             with st.spinner('Analisando documento...'):
-                result = analyze_document(form_recognizer_client, file_stream)
+                # Updated the function call here to match the defined function
+                result = analyze_document_from_stream(form_recognizer_client, file_stream)
+
 
             file_stream.seek(0)  # Volta ao início do arquivo para reutilização
             image = Image.open(file_stream)
@@ -90,10 +92,11 @@ def main():
         elif uploaded_file is None:
             st.write("Aguardando upload do arquivo...")
 
-def analyze_document_from_stream(form_recognizer_client, file_stream):
+def analyze_document(form_recognizer_client, file_stream):
     """Analisa o documento fornecido como um stream de arquivo e retorna os resultados."""
     poller = form_recognizer_client.begin_analyze_document("prebuilt-layout", file_stream)
     return poller.result()
+
 
 def table_to_dataframe(table):
     """Converte uma tabela extraída pelo Form Recognizer em um DataFrame do Pandas."""
