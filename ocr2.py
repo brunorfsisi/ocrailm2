@@ -8,6 +8,8 @@ from msrest.authentication import CognitiveServicesCredentials
 from io import BytesIO  # Adicionando a importação necessária
 import time
 import json
+import cv2
+import numpy as np
 
 # Função para a página de Extração de Dados com Inteligência Artificial
 def data_extraction_page():
