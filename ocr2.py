@@ -159,9 +159,20 @@ def azure_cv_page():
                     break
                 time.sleep(1)
 
-        # Exibe os resultados
-        # Exibe os resultados
+        # Exibe os resultados e desenha os bounding boxes
         if read_results.status == 'succeeded':
+            image_cv = cv2.imdecode(np.frombuffer(uploaded_file.getvalue(), np.uint8), cv2.IMREAD_COLOR)
+
+            for result in read_results.analyze_result.read_results:
+                for line in result.lines:
+                    bbox = [int(coord) for coord in line.bounding_box]
+                    cv2.rectangle(image_cv, (bbox[0], bbox[1]), (bbox[4], bbox[5]), (255, 0, 0), 2)
+
+            image_pil = Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
+            st.image(image_pil, caption="Imagem com Bounding Boxes", use_column_width=True)
+
+            # Exibe o texto reconhecido
+            st.write("Palavras reconhecidas:")
             lines_data = []
             for result in read_results.analyze_result.read_results:
                 for line in result.lines:
