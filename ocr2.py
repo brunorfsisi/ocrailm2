@@ -10,6 +10,8 @@ import time
 import json
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
+import scipy.stats as stats
 
 # Função para a página de Extração de Dados com Inteligência Artificial
 def data_extraction_page():
