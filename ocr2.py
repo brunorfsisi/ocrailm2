@@ -142,11 +142,10 @@ def azure_cv_page():
     computervision_client = ComputerVisionClient(endpoint, CognitiveServicesCredentials(key))
 
     uploaded_file = st.file_uploader("Carregue uma imagem", type=["png", "jpg", "jpeg"])
-
+    color_palette = ['#027e7b', '#efb014', '#e47124', '#bd133c']
     if uploaded_file is not None:
         # Converte o arquivo carregado em bytes e exibe a imagem
         image_bytes = BytesIO(uploaded_file.getvalue())
-        st.image(uploaded_file, caption="Imagem Carregada", use_column_width=True)
         
         # Inicia a operação de reconhecimento de texto (OCR) na imagem
         with st.spinner('Extraindo texto...'):
@@ -163,21 +162,33 @@ def azure_cv_page():
                     break
                 time.sleep(1)
 
-        # Exibe os resultados e desenha os bounding boxes
+        # Verifica se o status da leitura foi bem-sucedido
         if read_results.status == 'succeeded':
             image_cv = cv2.imdecode(np.frombuffer(uploaded_file.getvalue(), np.uint8), cv2.IMREAD_COLOR)
+
+            confidences = []  # Lista para armazenar as confianças
 
             for result in read_results.analyze_result.read_results:
                 for line in result.lines:
                     bbox = [int(coord) for coord in line.bounding_box]
                     cv2.rectangle(image_cv, (bbox[0], bbox[1]), (bbox[4], bbox[5]), (255, 0, 0), 2)
+                    confidences.append(line.appearance.style.confidence)  # Adiciona a confiança à lista
 
             image_pil = Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
-            st.image(image_pil, caption="Imagem com Bounding Boxes", use_column_width=True)
+
+            # Divide a largura da página em duas colunas
+            col1, col2 = st.columns(2)
+
+            # Exibe a imagem carregada e a imagem com bounding boxes lado a lado
+            with col1:
+                st.image(uploaded_file, caption="Imagem Carregada")
+            with col2:
+                st.image(image_pil, caption="Imagem com Bounding Boxes")
 
             # Exibe o texto reconhecido
             st.write("Palavras reconhecidas:")
             lines_data = []
+
             for result in read_results.analyze_result.read_results:
                 for line in result.lines:
                     line_data = {
@@ -188,7 +199,39 @@ def azure_cv_page():
 
             if lines_data:
                 df = pd.DataFrame(lines_data)
-                st.table(df)
+                st.table(df.head(10))
+
+                # Calcula a média e o desvio padrão das confianças
+                mean_confidence = np.mean(confidences)
+                std_confidence = np.std(confidences)
+                mean_confidence_percent = mean_confidence * 100
+
+                # Exibe a média e o desvio padrão da confiança em porcentagem com texto maior e em negrito
+                st.markdown(f"**Média da Confiança: {mean_confidence_percent:.2f}%**")
+                st.markdown(f"**Desvio Padrão da Confiança: {std_confidence:.2f}**")
+
+                # Plota histograma e distribuição lado a lado
+                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+
+                # Plota o histograma das confianças
+                ax1.hist(confidences, bins=10, color=color_palette[0], alpha=0.7)
+                ax1.set_xlabel('Confiança')
+                ax1.set_ylabel('Frequência')
+                ax1.set_title('Histograma de Confianças')
+
+                # Plota a distribuição das confianças usando a distribuição beta
+                x = np.linspace(0, 1, 100)
+                a = mean_confidence * ((mean_confidence * (1 - mean_confidence)) / (std_confidence ** 2) - 1)
+                b = a * (1 - mean_confidence) / mean_confidence
+                ax2.plot(x, stats.beta.pdf(x, a, b), color=color_palette[1])
+                ax2.fill_between(x, stats.beta.pdf(x, a, b), color=color_palette[1], alpha=0.5)
+                ax2.set_xlabel('Confiança')
+                ax2.set_ylabel('Densidade')
+                ax2.set_title('Distribuição da Confiança (Beta)')
+
+                plt.tight_layout()  # Ajusta o layout para evitar sobreposição
+                st.pyplot(fig)
+
             else:
                 st.write("Nenhum texto foi detectado na imagem.")
 
